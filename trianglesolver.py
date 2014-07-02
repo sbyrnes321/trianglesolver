@@ -1,6 +1,9 @@
 """
 Written by Steven Byrnes, http://sjbyrnes.com/
 
+Download: https://pypi.python.org/pypi/trianglesolver/
+Source code repository: https://github.com/sbyrnes321/trianglesolver
+
 This little package applies the law of sines or cosines to find all the
 sides and angles of a triangle, if you know some of the sides and/or
 angles.
