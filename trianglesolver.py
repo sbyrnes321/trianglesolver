@@ -67,7 +67,7 @@ def ssa(d, e, D, ssa_flag):
         E = pi/2
     elif sinE > 1:
         raise ValueError('No such triangle')
-    elif ssa == 'forbid':
+    elif ssa_flag == 'forbid':
         raise ValueError('Two different triangles fit this description')
     else:
         E = asin(sinE)
