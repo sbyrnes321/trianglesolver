@@ -34,7 +34,7 @@ descrip = ("Find all the sides and angles of a triangle, if you know some "
 
 setup(
     name = "trianglesolver",
-    version = 1.1,
+    version = 1.2,
     author = "Steven Byrnes",
     author_email = "steven.byrnes@gmail.com",
     description = descrip,
