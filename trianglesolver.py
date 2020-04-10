@@ -27,11 +27,7 @@ convert::
 """
 
 from __future__ import division, print_function
-from math import sin, cos, pi, sqrt, acos, asin
-
-import sys
-EPSILON = sys.float_info.epsilon # typical floating-point calculation error
-
+from math import sin, cos, pi, sqrt, acos, asin, isclose
 
 # 5 * degree is 5 degrees in radians
 # X / degree is the angle X expressed in degrees
@@ -60,42 +56,61 @@ def sas(d,e,F):
 
 
 def ssa(d, e, D, ssa_flag):
-    """ This function solves the triangle and returns (d,e,f,D,E,F) """
+    """ This function solves the triangle and returns (d,e,f,D,E,F)
+    See docstring for solve() for definition of ssa_flag"""
+    assert ssa_flag in ('acute', 'obtuse', 'forbid'), 'Invalid value of ssa_flag'
     sinE = sin(D) * e / d
-    if abs(sinE - 1) < 100 * EPSILON:
+
+    # This whole part is to calculate E
+    if isclose(sinE, 1):
         # Right triangle, where the solution is unique
         E = pi/2
-    elif sinE > 1:
-        raise ValueError('No such triangle')
-    elif ssa_flag == 'forbid':
-        raise ValueError('Two different triangles fit this description')
     else:
-        E = asin(sinE)
-        if ssa_flag == 'obtuse':
-            E = pi - E
+        assert sinE < 1, 'No such triangle'
+        E_acute = asin(sinE)
+        E_obtuse = pi - E_acute
+        acute_is_valid = (0 < (pi - D - E_acute) < pi)
+        obtuse_is_valid = (0 < (pi - D - E_obtuse) < pi)
+
+        if ssa_flag == 'acute':
+            assert acute_is_valid, 'No such triangle'
+            E = E_acute
+        elif ssa_flag == 'obtuse':
+            assert obtuse_is_valid, 'No such triangle'
+            E = E_obtuse
+        else:
+            assert ssa_flag == 'forbid'
+            if acute_is_valid and obtuse_is_valid:
+                raise ValueError('Two different triangles fit this description')
+            if (not acute_is_valid) and (not obtuse_is_valid):
+                raise ValueError('No such triangle')
+            E = E_acute if acute_is_valid else E_obtuse
+    # Now that we know E, the rest is straightforward
     F = pi - D - E
     e,f,d,E,F,D = aaas(E,F,D,d)
     return (d,e,f,D,E,F)
 
 
 # ---------- Main function you should use ------------------------- #
-    
+
 def solve(a=None, b=None, c=None, A=None, B=None, C=None, ssa_flag='forbid'):
     """
     Solve to find all the information about a triangle, given partial
     information.
-    
+
     a, b, c, A, B, and C are the three sides and angles. (e.g. A is the angle
-    opposite the side of length a.) Out of these six possibilities, you need 
+    opposite the side of length a.) Out of these six possibilities, you need
     to tell the program exactly three. Then the program will tell you all six.
-    
+
     It returns a tuple (a, b, c, A, B, C).
-    
+
     "ssa" is the situation when you give two sides and an angle which is not
     between them. This is usually not enough information to specify a unique
-    triangle. (Except in one special case involving right triangles.) Instead
-    there are usually two possibilities.
-    
+    triangle. Usually there are two possible triangles—except for a special
+    case with right triangles where the two possible triangles are the same
+    (the equation has a "double root"), and some cases where one of the two
+    possible triangles has a negative angle.
+
     Therefore there is an 'ssa_flag'. You can set it to'forbid' (raise an error
     if the answer is not unique - the default setting), or 'acute' (where the
     unknown angle across from the known side is chosen to be acute) or 'obtuse'
@@ -108,7 +123,7 @@ def solve(a=None, b=None, c=None, A=None, B=None, C=None, ssa_flag='forbid'):
     assert all(x > 0 for x in (a,b,c,A,B,C) if x is not None)
     assert all(x < pi for x in (A,B,C) if x is not None)
     assert ssa_flag in ('forbid', 'acute', 'obtuse')
-    
+
     # If three sides are known...
     if sum(x is not None for x in (a,b,c)) == 3:
         a,b,c,A,B,C = sss(a,b,c)
@@ -129,7 +144,7 @@ def solve(a=None, b=None, c=None, A=None, B=None, C=None, ssa_flag='forbid'):
             c,a,b,C,A,B = ssa(c, a, C, ssa_flag)
         elif all(x is not None for x in (c, C, b)):
             c,b,a,C,B,A = ssa(c, b, C, ssa_flag)
-        
+
         # sas case
         elif all(x is not None for x in (a, b, C)):
             a,b,c,A,B,C = sas(a, b, C)
@@ -140,7 +155,7 @@ def solve(a=None, b=None, c=None, A=None, B=None, C=None, ssa_flag='forbid'):
         else:
             raise ValueError('Oops, this code should never run')
         return (a,b,c,A,B,C)
-    
+
     # If one side and two angles are known...
     if sum(x is not None for x in (a,b,c)) == 1:
         # Find the third angle...
@@ -165,57 +180,54 @@ def solve(a=None, b=None, c=None, A=None, B=None, C=None, ssa_flag='forbid'):
 
 #---------------- Tests ------------------------------------------------- #
 
-def floats_are_equal(x,y):
-    return abs(x - y) <= 100 * EPSILON * (abs(x) + abs(y))
-
-def float_tuples_are_equal(x,y):
-    return all(floats_are_equal(x[i], y[i]) for i in range(len(x)))
+def tuple_isclose(x,y):
+    return all(isclose(x[i], y[i]) for i in range(len(x)))
 
 def test_triangle(a,b,c,A,B,C):
     """ Check that the triangle satisfies the law of cosines and law of
     sines"""
-    assert floats_are_equal(a/sin(A), b/sin(B))
-    assert floats_are_equal(a/sin(A), c/sin(C))
-    assert floats_are_equal(c**2, a**2 + b**2 - 2 * a * b * cos(C))
-    assert floats_are_equal(a**2, b**2 + c**2 - 2 * b * c * cos(A))
-    assert floats_are_equal(b**2, c**2 + a**2 - 2 * c * a * cos(B))
+    assert isclose(a/sin(A), b/sin(B))
+    assert isclose(a/sin(A), c/sin(C))
+    assert isclose(c**2, a**2 + b**2 - 2 * a * b * cos(C))
+    assert isclose(a**2, b**2 + c**2 - 2 * b * c * cos(A))
+    assert isclose(b**2, c**2 + a**2 - 2 * c * a * cos(B))
 
 def test_solver(a,b,c):
     """ Test that the program works, for a triangle of sides a,b,c."""
     # first find the angles, testing SSS
     a1,b1,c1,A,B,C = solve(a=a,b=b,c=c)
-    assert float_tuples_are_equal((a,b,c), (a1,b1,c1))
+    assert tuple_isclose((a,b,c), (a1,b1,c1))
     test_triangle(a,b,c,A,B,C)
     tri = (a,b,c,A,B,C)
-    
+
     # SAS tests
-    assert float_tuples_are_equal(tri, solve(a=a,b=b,C=C))
-    assert float_tuples_are_equal(tri, solve(a=a,c=c,B=B))
-    assert float_tuples_are_equal(tri, solve(b=b,c=c,A=A))
-    
+    assert tuple_isclose(tri, solve(a=a,b=b,C=C))
+    assert tuple_isclose(tri, solve(a=a,c=c,B=B))
+    assert tuple_isclose(tri, solve(b=b,c=c,A=A))
+
     # SAA / ASA tests
-    assert float_tuples_are_equal(tri, solve(a=a, A=A, B=B))
-    assert float_tuples_are_equal(tri, solve(a=a, A=A, C=C))
-    assert float_tuples_are_equal(tri, solve(a=a, B=B, C=C))
-    assert float_tuples_are_equal(tri, solve(b=b, A=A, B=B))
-    assert float_tuples_are_equal(tri, solve(b=b, A=A, C=C))
-    assert float_tuples_are_equal(tri, solve(b=b, B=B, C=C))
-    assert float_tuples_are_equal(tri, solve(c=c, A=A, B=B))
-    assert float_tuples_are_equal(tri, solve(c=c, A=A, C=C))
-    assert float_tuples_are_equal(tri, solve(c=c, B=B, C=C))
+    assert tuple_isclose(tri, solve(a=a, A=A, B=B))
+    assert tuple_isclose(tri, solve(a=a, A=A, C=C))
+    assert tuple_isclose(tri, solve(a=a, B=B, C=C))
+    assert tuple_isclose(tri, solve(b=b, A=A, B=B))
+    assert tuple_isclose(tri, solve(b=b, A=A, C=C))
+    assert tuple_isclose(tri, solve(b=b, B=B, C=C))
+    assert tuple_isclose(tri, solve(c=c, A=A, B=B))
+    assert tuple_isclose(tri, solve(c=c, A=A, C=C))
+    assert tuple_isclose(tri, solve(c=c, B=B, C=C))
 
     Atype = 'acute' if A < pi/2 else 'obtuse'
     Btype = 'acute' if B < pi/2 else 'obtuse'
     Ctype = 'acute' if C < pi/2 else 'obtuse'
-    
+
     # SSA tests
-    assert float_tuples_are_equal(tri, solve(a=a, b=b, A=A, ssa_flag=Btype))
-    assert float_tuples_are_equal(tri, solve(a=a, b=b, B=B, ssa_flag=Atype))
-    assert float_tuples_are_equal(tri, solve(a=a, c=c, A=A, ssa_flag=Ctype))
-    assert float_tuples_are_equal(tri, solve(a=a, c=c, C=C, ssa_flag=Atype))
-    assert float_tuples_are_equal(tri, solve(b=b, c=c, B=B, ssa_flag=Ctype))
-    assert float_tuples_are_equal(tri, solve(b=b, c=c, C=C, ssa_flag=Btype))
-    
+    assert tuple_isclose(tri, solve(a=a, b=b, A=A, ssa_flag=Btype))
+    assert tuple_isclose(tri, solve(a=a, b=b, B=B, ssa_flag=Atype))
+    assert tuple_isclose(tri, solve(a=a, c=c, A=A, ssa_flag=Ctype))
+    assert tuple_isclose(tri, solve(a=a, c=c, C=C, ssa_flag=Atype))
+    assert tuple_isclose(tri, solve(b=b, c=c, B=B, ssa_flag=Ctype))
+    assert tuple_isclose(tri, solve(b=b, c=c, C=C, ssa_flag=Btype))
+
 def run_lots_of_tests():
     for a,b,c in ((7,8,9), (5,6,10), (5,10,6), (10,5,6), (5,12,13),
                   (12,5,13), (12,13,5)):
